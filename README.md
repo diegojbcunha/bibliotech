@@ -114,7 +114,8 @@ bibliotech/
 
 O relatório técnico completo em PDF está disponível neste repositório:
 
-📎 [Relatorio_Testes_BiblioTech_GrupoX.pdf](#)
+📎 [[Relatorio_Testes_BiblioTech.pdf](https://github.com/user-attachments/files/28935288/Relatorio_Testes_BiblioTech.pdf)
+](#)
 
 ## Tecnologias Utilizadas
 
