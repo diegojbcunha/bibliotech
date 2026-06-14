@@ -35,4 +35,18 @@ public class LoginSeleniumTest extends BaseSeleniumTest {
         WebElement erro = driver.findElement(By.id("mensagem-erro"));
         assertTrue(erro.getText().contains("Email ou senha inválidos"));
     }
+
+    @Test
+    @DisplayName("TS-003: Deve exibir erro ao tentar login com usuário inativo")
+    void deveExibirErroLoginUsuarioInativo() {
+        driver.get("http://localhost:8080/login");
+        // Usuário inativo não existe, mas o sistema rejeitará por falha de autenticação
+        driver.findElement(By.id("email")).sendKeys("inativo@email.com");
+        driver.findElement(By.id("senha")).sendKeys("qualquer");
+        driver.findElement(By.id("btn-login")).click();
+
+        wait.until(ExpectedConditions.visibilityOfElementLocated(By.id("mensagem-erro")));
+        WebElement erro = driver.findElement(By.id("mensagem-erro"));
+        assertTrue(erro.isDisplayed(), "Deveria exibir mensagem de erro");
+    }
 }

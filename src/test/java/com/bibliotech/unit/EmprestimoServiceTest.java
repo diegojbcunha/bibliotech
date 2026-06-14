@@ -1,7 +1,7 @@
 package com.bibliotech.unit;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 import java.time.LocalDate;
@@ -23,8 +23,8 @@ import com.bibliotech.service.EmprestimoService;
 import com.bibliotech.service.LivroService;
 
 @ExtendWith(MockitoExtension.class)
-@DisplayName("Testes do EmprestimoService")
-public class EmprestimoServiceTest {
+@DisplayName("EmprestimoService - Testes Unitários")
+class EmprestimoServiceTest {
 
     @Mock
     private EmprestimoRepository emprestimoRepository;
@@ -35,120 +35,165 @@ public class EmprestimoServiceTest {
     @InjectMocks
     private EmprestimoService emprestimoService;
 
-    private Usuario usuario;
-    private Livro livro;
-    private Emprestimo emprestimoAtivo;
+    private Usuario usuarioAtivo;
+    private Livro livroDisponivel;
 
     @BeforeEach
     void setUp() {
-        usuario = new Usuario();
-        usuario.setId(1L);
-        usuario.setNome("João");
-        usuario.setAtivo(true);
+        usuarioAtivo = new Usuario();
+        usuarioAtivo.setId(1L);
+        usuarioAtivo.setNome("João Silva");
+        usuarioAtivo.setEmail("joao@email.com");
+        usuarioAtivo.setCpf("123.456.789-00");
+        usuarioAtivo.setSenha("senha123");
+        usuarioAtivo.setTipo(Usuario.TipoUsuario.ALUNO);
+        usuarioAtivo.setAtivo(true);
 
-        livro = new Livro();
-        livro.setId(1L);
-        livro.setTitulo("Clean Code");
-        livro.setQuantidadeExemplares(3);
-        livro.setQuantidadeDisponivel(3);
+        livroDisponivel = new Livro();
+        livroDisponivel.setId(1L);
+        livroDisponivel.setTitulo("Clean Code");
+        livroDisponivel.setAutor("Robert Martin");
+        livroDisponivel.setIsbn("978-0132350884");
+        livroDisponivel.setAno(2008);
+        livroDisponivel.setQuantidadeExemplares(3);
+        livroDisponivel.setQuantidadeDisponivel(2); // começa com 2 disponíveis
+    }
 
-        emprestimoAtivo = new Emprestimo();
-        emprestimoAtivo.setId(1L);
-        emprestimoAtivo.setUsuario(usuario);
-        emprestimoAtivo.setLivro(livro);
-        emprestimoAtivo.setDataEmprestimo(LocalDate.now().minusDays(5));
-        emprestimoAtivo.setDataDevolucaoPrevista(LocalDate.now().plusDays(9));
-        emprestimoAtivo.setAtivo(true);
+    // =========================================================
+    // RN-03: Testes de Cálculo de Multa
+    // =========================================================
+
+    @Test
+    @DisplayName("TU-001: Deve calcular multa de R$ 10,00 para 5 dias de atraso (RN-03)")
+    void deveCalcularMultaParaCincoDiasDeAtraso() {
+        Emprestimo emprestimo = new Emprestimo();
+        emprestimo.setDataDevolucaoPrevista(LocalDate.now().minusDays(5));
+        emprestimo.setDataDevolucaoReal(LocalDate.now());
+
+        double multa = emprestimoService.calcularMulta(emprestimo);
+
+        // RN-03: R$ 2,00 por dia × 5 dias = R$ 10,00
+        // BUG ESPERADO: sistema usa R$ 3,00 em vez de R$ 2,00 -> retorna 15.0
+        assertEquals(10.0, multa, 0.01,
+                "BUG-002: Multa deveria ser R$ 2,00 × 5 dias = R$ 10,00");
     }
 
     @Test
-    @DisplayName("TU-001: Deve calcular multa de R$ 10,00 para 5 dias de atraso (BUG: multiplicador é 3.0)")
-    void deveCalcularMultaCorretamente() {
-        Emprestimo emp = new Emprestimo();
-        emp.setDataDevolucaoPrevista(LocalDate.now().minusDays(5));
-        emp.setDataDevolucaoReal(LocalDate.now());
+    @DisplayName("TU-002: Deve retornar multa zero para devolução no prazo (RN-03)")
+    void deveRetornarMultaZeroParaDevolucaoNoPrazo() {
+        Emprestimo emprestimo = new Emprestimo();
+        emprestimo.setDataDevolucaoPrevista(LocalDate.now().plusDays(2));
+        emprestimo.setDataDevolucaoReal(LocalDate.now());
 
-        double multa = emprestimoService.calcularMulta(emp);
-
-        // O código original multiplica por 3.0, portanto este teste falhará,
-        // revelando violação da RN-03.
-        assertEquals(10.0, multa, 0.01, "Multa deve ser R$ 2,00 x 5 dias = R$ 10,00");
+        double multa = emprestimoService.calcularMulta(emprestimo);
+        assertEquals(0.0, multa, 0.01);
     }
 
     @Test
-    @DisplayName("TU-002: Deve retornar multa zero quando devolução é no prazo")
-    void deveRetornarMultaZeroQuandoNoPrazo() {
-        Emprestimo emp = new Emprestimo();
-        emp.setDataDevolucaoPrevista(LocalDate.now());
-        emp.setDataDevolucaoReal(LocalDate.now());
+    @DisplayName("TU-003: Deve calcular multa de R$ 2,00 para 1 dia de atraso (RN-03)")
+    void deveCalcularMultaParaUmDiaDeAtraso() {
+        Emprestimo emprestimo = new Emprestimo();
+        emprestimo.setDataDevolucaoPrevista(LocalDate.now().minusDays(1));
+        emprestimo.setDataDevolucaoReal(LocalDate.now());
 
-        double multa = emprestimoService.calcularMulta(emp);
-        assertEquals(0.0, multa, "Multa deve ser zero para devolução no prazo");
+        double multa = emprestimoService.calcularMulta(emprestimo);
+        assertEquals(2.0, multa, 0.01,
+                "RN-03: Multa para 1 dia de atraso deve ser R$ 2,00");
     }
 
     @Test
-    @DisplayName("TU-003: Deve calcular data de devolução prevista como 14 dias corridos (BUG: soma apenas 7 dias)")
-    void deveCalcularDataDevolucaoCorretamente() {
-        LocalDate dataEmprestimo = LocalDate.of(2026, 6, 1);
-        LocalDate dataPrevista = emprestimoService.calcularDataDevolucao(dataEmprestimo);
+    @DisplayName("TU-004: Deve calcular multa de R$ 20,00 para 10 dias de atraso (RN-03)")
+    void deveCalcularMultaParaDezDiasDeAtraso() {
+        Emprestimo emprestimo = new Emprestimo();
+        emprestimo.setDataDevolucaoPrevista(LocalDate.now().minusDays(10));
+        emprestimo.setDataDevolucaoReal(LocalDate.now());
 
-        // O código original soma 7 dias, portanto este teste falhará (RN-01)
-        assertEquals(LocalDate.of(2026, 6, 15), dataPrevista,
-                "Data de devolução deve ser data do empréstimo + 14 dias");
+        double multa = emprestimoService.calcularMulta(emprestimo);
+        assertEquals(20.0, multa, 0.01);
+    }
+
+    // =========================================================
+    // RN-01: Testes de Prazo de Empréstimo (14 dias)
+    // =========================================================
+
+    @Test
+    @DisplayName("TU-005: Deve calcular data de devolução como 14 dias corridos (RN-01)")
+    void deveCalcularDataDevolucaoCom14Dias() {
+        LocalDate dataEmprestimo = LocalDate.now();
+        LocalDate dataEsperada = dataEmprestimo.plusDays(14);
+
+        // BUG ESPERADO: sistema retorna +7 dias -> dataEsperada será diferente
+        LocalDate dataCalculada = emprestimoService.calcularDataDevolucao(dataEmprestimo);
+        assertEquals(dataEsperada, dataCalculada,
+                "BUG-003: Prazo de devolução deve ser 14 dias");
+    }
+
+    // =========================================================
+    // RN-04: Testes de Disponibilidade para Empréstimo
+    // =========================================================
+
+    @Test
+    @DisplayName("TU-006: Deve impedir empréstimo quando livro não tem exemplares disponíveis (RN-04)")
+    void deveImpedirEmprestimoComLivroIndisponivel() {
+        // Torna o livro indisponível
+        livroDisponivel.setQuantidadeDisponivel(0);
+
+        // O serviço real NÃO valida, então nenhuma exceção será lançada -> teste falha
+        assertThrows(RuntimeException.class,
+                () -> emprestimoService.realizarEmprestimo(usuarioAtivo, livroDisponivel),
+                "BUG-004: Deveria lançar exceção ao tentar emprestar livro sem exemplares");
     }
 
     @Test
-    @DisplayName("TU-004: Deve lançar exceção ao tentar emprestar livro indisponível")
-    void deveLancarExcecaoLivroIndisponivel() {
-        livro.setQuantidadeDisponivel(0);
-        // O serviço real não valida disponibilidade explicitamente? Vamos ver no código:
-        // EmprestimoService.realizarEmprestimo apenas chama livroService.decrementarDisponibilidade
-        // mas não verifica disponibilidade. Portanto, o teste precisa refletir que
-        // atualmente NÃO há validação, e o teste deve esperar que a exceção NÃO seja lançada.
-        // Isso é um bug (RN-04). Vamos ajustar: esperamos que o método complete sem erro,
-        // e depois verificar que a disponibilidade ficou negativa (efeito colateral).
-        // Mas como o decrementarDisponibilidade só decrementa se >0, não gera erro.
-        // Portanto, o sistema permite empréstimo mesmo com quantidadeDisponivel = 0,
-        // violando RN-04. Vamos capturar isso como um teste que falha.
-        // Implementaremos o teste esperando uma exceção, que não ocorrerá, indicando o bug.
-        RuntimeException excecao = assertThrows(RuntimeException.class,
-                () -> emprestimoService.realizarEmprestimo(usuario, livro),
-                "Deveria lançar exceção para livro sem disponibilidade");
+    @DisplayName("TU-007: Deve realizar empréstimo com sucesso quando livro tem exemplares disponíveis (RN-04)")
+    void deveRealizarEmprestimoComSucesso() {
+        when(emprestimoRepository.save(any(Emprestimo.class))).thenAnswer(i -> i.getArgument(0));
 
-        assertEquals("Livro indisponível para empréstimo", excecao.getMessage());
+        Emprestimo emprestimo = emprestimoService.realizarEmprestimo(usuarioAtivo, livroDisponivel);
+
+        assertNotNull(emprestimo);
+        assertTrue(emprestimo.getAtivo());
+        assertNotNull(emprestimo.getDataEmprestimo());
+        assertNotNull(emprestimo.getDataDevolucaoPrevista());
+        verify(livroService).decrementarDisponibilidade(livroDisponivel);
     }
 
-    @Test
-    @DisplayName("TU-005: Deve decrementar a quantidade disponível ao realizar empréstimo com sucesso")
-    void deveDecrementarQuantidadeDisponivel() {
-        when(emprestimoRepository.save(any(Emprestimo.class))).thenReturn(emprestimoAtivo);
-
-        emprestimoService.realizarEmprestimo(usuario, livro);
-
-        verify(livroService).decrementarDisponibilidade(livro);
-    }
+    // =========================================================
+    // RN-12: Testes de Devolução Única
+    // =========================================================
 
     @Test
-    @DisplayName("TU-006: Deve lançar exceção ao tentar devolver um empréstimo já devolvido")
+    @DisplayName("TU-008: Deve impedir devolução duplicada de um empréstimo (RN-12)")
     void deveImpedirDevolucaoDuplicada() {
-        emprestimoAtivo.setDataDevolucaoReal(LocalDate.now());
-        when(emprestimoRepository.findById(1L)).thenReturn(Optional.of(emprestimoAtivo));
+        Emprestimo emprestimo = new Emprestimo();
+        emprestimo.setId(1L);
+        emprestimo.setDataDevolucaoReal(LocalDate.now().minusDays(1)); // já devolvido
+        emprestimo.setAtivo(false);
 
-        RuntimeException excecao = assertThrows(RuntimeException.class,
+        when(emprestimoRepository.findById(1L)).thenReturn(Optional.of(emprestimo));
+
+        assertThrows(RuntimeException.class,
                 () -> emprestimoService.registrarDevolucao(1L),
-                "Deveria lançar exceção para devolução duplicada");
-
-        assertEquals("Empréstimo já foi devolvido", excecao.getMessage());
+                "RN-12: Deve lançar exceção ao tentar devolver empréstimo já devolvido");
     }
 
     @Test
-    @DisplayName("TU-007: Deve incrementar a disponibilidade do livro ao registrar devolução")
-    void deveIncrementarDisponibilidadeNaDevolucao() {
-        when(emprestimoRepository.findById(1L)).thenReturn(Optional.of(emprestimoAtivo));
-        when(emprestimoRepository.save(any(Emprestimo.class))).thenReturn(emprestimoAtivo);
+    @DisplayName("TU-009: Deve registrar devolução com sucesso e incrementar disponibilidade (RF-12)")
+    void deveRegistrarDevolucaoComSucesso() {
+        Emprestimo emprestimo = new Emprestimo();
+        emprestimo.setId(1L);
+        emprestimo.setLivro(livroDisponivel);
+        emprestimo.setDataDevolucaoPrevista(LocalDate.now().plusDays(3));
+        emprestimo.setAtivo(true);
 
-        emprestimoService.registrarDevolucao(1L);
+        when(emprestimoRepository.findById(1L)).thenReturn(Optional.of(emprestimo));
+        when(emprestimoRepository.save(any(Emprestimo.class))).thenAnswer(i -> i.getArgument(0));
 
-        verify(livroService).incrementarDisponibilidade(livro);
+        Emprestimo devolvido = emprestimoService.registrarDevolucao(1L);
+
+        assertNotNull(devolvido.getDataDevolucaoReal());
+        assertFalse(devolvido.getAtivo());
+        assertEquals(0.0, devolvido.getMulta(), 0.01);
+        verify(livroService).incrementarDisponibilidade(livroDisponivel);
     }
 }

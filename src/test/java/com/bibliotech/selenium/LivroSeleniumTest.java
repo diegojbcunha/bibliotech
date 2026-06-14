@@ -46,7 +46,7 @@ public class LivroSeleniumTest extends BaseSeleniumTest {
         driver.get("http://localhost:8080/livros/novo");
         driver.findElement(By.id("titulo")).sendKeys("Livro Duplicado");
         driver.findElement(By.id("autor")).sendKeys("Outro Autor");
-        driver.findElement(By.id("isbn")).sendKeys("978-1111111111"); // ISBN já usado
+        driver.findElement(By.id("isbn")).sendKeys("978-1111111111"); // ISBN repetido
         driver.findElement(By.id("ano")).sendKeys("2021");
         driver.findElement(By.id("quantidadeExemplares")).clear();
         driver.findElement(By.id("quantidadeExemplares")).sendKeys("3");

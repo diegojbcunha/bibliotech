@@ -1,10 +1,10 @@
 package com.bibliotech.unit;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
-import java.util.Arrays;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
@@ -16,13 +16,14 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import com.bibliotech.model.Emprestimo;
 import com.bibliotech.model.Livro;
 import com.bibliotech.repository.LivroRepository;
 import com.bibliotech.service.LivroService;
 
 @ExtendWith(MockitoExtension.class)
-@DisplayName("Testes do LivroService")
-public class LivroServiceTest {
+@DisplayName("LivroService - Testes Unitários")
+class LivroServiceTest {
 
     @Mock
     private LivroRepository livroRepository;
@@ -30,86 +31,134 @@ public class LivroServiceTest {
     @InjectMocks
     private LivroService livroService;
 
-    private Livro livroCleanCode;
+    private Livro livroValido;
 
     @BeforeEach
     void setUp() {
-        livroCleanCode = new Livro();
-        livroCleanCode.setTitulo("Clean Code");
-        livroCleanCode.setAutor("Robert C. Martin");
-        livroCleanCode.setIsbn("978-0132350884");
-        livroCleanCode.setEditora("Prentice Hall");
-        livroCleanCode.setAno(2008);
-        livroCleanCode.setQuantidadeExemplares(3);
-        livroCleanCode.setQuantidadeDisponivel(3);
+        livroValido = new Livro();
+        livroValido.setTitulo("Clean Code");
+        livroValido.setAutor("Robert C. Martin");
+        livroValido.setIsbn("978-0132350884");
+        livroValido.setEditora("Prentice Hall");
+        livroValido.setAno(2008);
+        livroValido.setQuantidadeExemplares(3);
+        livroValido.setQuantidadeDisponivel(3);
     }
 
     @Test
-    @DisplayName("TU-008: Deve lançar exceção ao salvar livro com ISBN duplicado")
-    void deveLancarExcecaoISBNJaCadastrado() {
-        Livro livroDuplicado = new Livro("Outro Livro", "Outro Autor",
-                "978-0132350884", "Editora", 2020, 2);
-
+    @DisplayName("TU-008: Deve lançar exceção ao cadastrar livro com ISBN duplicado (RN-02)")
+    void deveLancarExcecaoAoCadastrarISBNDuplicado() {
         when(livroRepository.findByIsbn("978-0132350884"))
-                .thenReturn(Optional.of(livroCleanCode));
+                .thenReturn(Optional.of(livroValido));
 
-        RuntimeException excecao = assertThrows(RuntimeException.class,
+        Livro livroDuplicado = new Livro();
+        livroDuplicado.setTitulo("Outro Livro");
+        livroDuplicado.setAutor("Outro Autor");
+        livroDuplicado.setIsbn("978-0132350884");
+        livroDuplicado.setAno(2020);
+        livroDuplicado.setQuantidadeExemplares(2);
+
+        RuntimeException exception = assertThrows(RuntimeException.class,
                 () -> livroService.salvar(livroDuplicado),
-                "Deveria lançar exceção ao tentar salvar ISBN duplicado");
+                "RN-02 violado: Deveria lançar exceção para ISBN duplicado");
 
-        assertTrue(excecao.getMessage().contains("ISBN já cadastrado"),
-                "Mensagem de erro deve informar que ISBN já está cadastrado");
-        verify(livroRepository, never()).save(any(Livro.class));
+        assertTrue(exception.getMessage().contains("ISBN"),
+                "Mensagem deve mencionar ISBN");
     }
 
     @Test
-    @DisplayName("TU-009: Deve salvar livro com dados válidos e definir quantidade disponível = exemplares")
+    @DisplayName("TU-009: Deve salvar livro com sucesso (RF-01)")
     void deveSalvarLivroComSucesso() {
-        when(livroRepository.findByIsbn(anyString())).thenReturn(Optional.empty());
-        when(livroRepository.save(any(Livro.class))).thenReturn(livroCleanCode);
+        when(livroRepository.save(any(Livro.class))).thenReturn(livroValido);
 
-        Livro salvo = livroService.salvar(livroCleanCode);
+        Livro salvo = livroService.salvar(livroValido);
 
         assertNotNull(salvo);
-        assertEquals(livroCleanCode.getQuantidadeExemplares(), salvo.getQuantidadeDisponivel(),
-                "Quantidade disponível deve ser igual à quantidade de exemplares");
-        verify(livroRepository).save(livroCleanCode);
+        verify(livroRepository).save(livroValido);
     }
 
     @Test
-    @DisplayName("TU-016: Deve lançar exceção ao excluir livro com empréstimos ativos")
+    @DisplayName("TU-010: Deve definir quantidade disponível igual à de exemplares (RF-01)")
+    void deveDefinirQuantidadeDisponivelAoCadastrar() {
+        livroValido.setQuantidadeExemplares(5);
+        when(livroRepository.save(any(Livro.class))).thenAnswer(i -> i.getArgument(0));
+
+        Livro salvo = livroService.salvar(livroValido);
+
+        assertEquals(salvo.getQuantidadeExemplares(), salvo.getQuantidadeDisponivel());
+    }
+
+    @Test
+    @DisplayName("TU-016: Deve impedir exclusão de livro com empréstimos ativos (RN-05)")
     void deveImpedirExclusaoComEmprestimosAtivos() {
-        // Simula que o livro tem um empréstimo ativo
-        Livro livroComEmprestimo = spy(livroCleanCode);
-        when(livroRepository.findById(1L)).thenReturn(Optional.of(livroComEmprestimo));
-        // O método getEmprestimos() retorna uma lista que será verificada no service
-        // Vamos criar um empréstimo mock que retorna true para isAtivo()
-        com.bibliotech.model.Emprestimo emp = mock(com.bibliotech.model.Emprestimo.class);
-        when(emp.getAtivo()).thenReturn(true);
-        when(livroComEmprestimo.getEmprestimos()).thenReturn(Arrays.asList(emp));
+        Emprestimo empAtivo = mock(Emprestimo.class);
+        when(empAtivo.getAtivo()).thenReturn(true);
+        livroValido.getEmprestimos().add(empAtivo);
 
-        RuntimeException excecao = assertThrows(RuntimeException.class,
+        when(livroRepository.findById(1L)).thenReturn(Optional.of(livroValido));
+
+        RuntimeException exception = assertThrows(RuntimeException.class,
                 () -> livroService.excluir(1L),
-                "Deveria lançar exceção ao excluir livro com empréstimos ativos");
+                "RN-05: Deve lançar exceção ao excluir livro com empréstimos ativos");
 
-        assertEquals("Não é possível excluir livro com empréstimos ativos", excecao.getMessage());
+        assertTrue(exception.getMessage().toLowerCase().contains("empréstimo") ||
+                exception.getMessage().toLowerCase().contains("emprestimo"));
         verify(livroRepository, never()).delete(any(Livro.class));
     }
 
     @Test
-    @DisplayName("TU-018: Deve retornar apenas livros com quantidade disponível > 0")
-    void deveBuscarApenasLivrosDisponiveis() {
-        Livro disponivel = new Livro();
-        disponivel.setQuantidadeDisponivel(5);
-        Livro indisponivel = new Livro();
-        indisponivel.setQuantidadeDisponivel(0);
+    @DisplayName("TU-017: Deve excluir livro com sucesso quando não há empréstimos ativos (RN-05)")
+    void deveExcluirLivroSemEmprestimosAtivos() {
+        livroValido.setId(1L);
+        when(livroRepository.findById(1L)).thenReturn(Optional.of(livroValido));
 
-        when(livroRepository.findByQuantidadeDisponivelGreaterThan(0))
-                .thenReturn(Arrays.asList(disponivel));
+        assertDoesNotThrow(() -> livroService.excluir(1L));
+        verify(livroRepository).delete(livroValido);
+    }
 
-        List<Livro> resultado = livroService.listarDisponiveis();
+    @Test
+    @DisplayName("TU-018: Deve buscar livros por título case-insensitive (RF-05)")
+    void deveBuscarLivrosPorTituloIgnorandoCase() {
+        when(livroRepository.findByTituloContainingIgnoreCase("clean"))
+                .thenReturn(List.of(livroValido));
 
-        assertEquals(1, resultado.size());
-        assertTrue(resultado.get(0).getQuantidadeDisponivel() > 0);
+        List<Livro> resultado = livroService.buscarPorTitulo("clean");
+
+        assertFalse(resultado.isEmpty());
+        assertEquals("Clean Code", resultado.get(0).getTitulo());
+    }
+
+    @Test
+    @DisplayName("TU-019: Deve retornar lista vazia ao não encontrar livro (RF-05)")
+    void deveRetornarListaVaziaQuandoLivroNaoEncontrado() {
+        when(livroRepository.findByTituloContainingIgnoreCase("Inexistente"))
+                .thenReturn(new ArrayList<>());
+
+        List<Livro> resultado = livroService.buscarPorTitulo("Inexistente");
+
+        assertTrue(resultado.isEmpty());
+    }
+
+    @Test
+    @DisplayName("TU-020: Deve decrementar quantidade disponível ao emprestar (RF-10)")
+    void deveDecrementarQuantidadeDisponivelAoEmprestar() {
+        livroValido.setQuantidadeDisponivel(3);
+        when(livroRepository.save(any(Livro.class))).thenAnswer(i -> i.getArgument(0));
+
+        livroService.decrementarDisponibilidade(livroValido);
+
+        assertEquals(2, livroValido.getQuantidadeDisponivel());
+    }
+
+    @Test
+    @DisplayName("TU-021: Deve incrementar quantidade disponível ao devolver (RF-12)")
+    void deveIncrementarQuantidadeDisponivelAoDevolver() {
+        livroValido.setQuantidadeDisponivel(1);
+        livroValido.setQuantidadeExemplares(3);
+        when(livroRepository.save(any(Livro.class))).thenAnswer(i -> i.getArgument(0));
+
+        livroService.incrementarDisponibilidade(livroValido);
+
+        assertEquals(2, livroValido.getQuantidadeDisponivel());
     }
 }

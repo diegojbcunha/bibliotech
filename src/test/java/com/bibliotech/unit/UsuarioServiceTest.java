@@ -87,15 +87,14 @@ public class UsuarioServiceTest {
     @Test
     @DisplayName("TU-014: Deve autenticar usuário com credenciais corretas (BUG esperado: comparação de senha com ==)")
     void deveAutenticarUsuarioAtivo() {
-        // Nota: O método autenticar usa '==' para comparar senhas, o que nunca funciona
-        // para Strings não internadas. Portanto, este teste DEVE falhar.
         when(usuarioRepository.findByEmail("joao@email.com")).thenReturn(Optional.of(usuarioJoao));
 
-        Optional<Usuario> resultado = usuarioService.autenticar("joao@email.com", "senha123");
+        // Cria uma senha idêntica, mas como objeto separado (evita o pool de strings)
+        String senhaFornecida = new String("senha123");
+        Optional<Usuario> resultado = usuarioService.autenticar("joao@email.com", senhaFornecida);
 
-        // Como o código usa '==', o resultado será vazio, mesmo com a senha correta.
-        // Isso revela um bug de segurança (RN-08).
-        assertTrue(resultado.isPresent(), "Usuário deveria ser autenticado com senha correta");
+        // O serviço usa '==', portanto a autenticação falhará mesmo com a senha correta
+        assertTrue(resultado.isPresent(), "BUG-006: Deveria autenticar usuário com senha correta");
         assertEquals("João Silva", resultado.get().getNome());
     }
 

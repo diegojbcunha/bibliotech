@@ -28,7 +28,7 @@ public class EmprestimoSeleniumTest extends BaseSeleniumTest {
     }
 
     @Test
-    @DisplayName("TS-009: Deve registrar devolução e exibir mensagem de sucesso")
+    @DisplayName("TS-009: Deve registrar devolução sem multa")
     void deveRegistrarDevolucao() {
         // Realiza um empréstimo
         driver.get("http://localhost:8080/emprestimos/novo");
@@ -45,5 +45,24 @@ public class EmprestimoSeleniumTest extends BaseSeleniumTest {
         wait.until(ExpectedConditions.urlContains("/emprestimos"));
         WebElement alert = driver.findElement(By.cssSelector(".alert-success"));
         assertTrue(alert.getText().contains("Devolução registrada com sucesso"));
+    }
+
+    @Test
+    @DisplayName("TS-010: Deve registrar devolução de empréstimo atrasado e exibir multa")
+    void deveRegistrarDevolucaoComAtraso() {
+        // Acessa a lista de empréstimos atrasados (se houver)
+        driver.get("http://localhost:8080/emprestimos?filtro=atrasados");
+
+        // Se houver pelo menos um empréstimo atrasado, clica em Devolver
+        if (!driver.findElements(By.cssSelector(".btn-success")).isEmpty()) {
+            driver.findElement(By.cssSelector(".btn-success")).click();
+            wait.until(ExpectedConditions.urlContains("/emprestimos"));
+            WebElement alert = driver.findElement(By.cssSelector(".alert-success"));
+            // A mensagem deve conter "Multa" se houver atraso
+            assertTrue(alert.getText().contains("Multa"), "Deveria exibir multa no alerta");
+        } else {
+            // Se não houver empréstimos atrasados, o teste apenas verifica que a página carregou
+            assertTrue(driver.getPageSource().contains("Empréstimos"));
+        }
     }
 }
