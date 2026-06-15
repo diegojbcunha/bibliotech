@@ -16,7 +16,7 @@
 
 ---
 
-## ▶️ Como Executar os Testes
+## Como Executar os Testes
 
 ### Pré-requisitos
 
@@ -98,7 +98,7 @@ O relatório estará em: `target/site/surefire-report.html`
 ## Relatório Completo
 
 O relatório de testes em PDF está disponível no repositório:  
-👉 [Relatorio_Testes_BiblioTech.pdf](./Relatorio_Testes_BiblioTech.pdf)
+[Relatorio_Testes_BiblioTech.pdf](./Relatorio_Testes_BiblioTech.pdf)
 
 ---
 
